@@ -29,9 +29,9 @@ func DecodeFile(path string) (*Pattern, error) {
 // Pattern is the high level representation of the
 // drum pattern contained in a .splice file.
 type Pattern struct {
-	Version  string
-	Tempo    float32
-	Channels []Channel
+	Version string
+	Tempo   float32
+	Tracks  []Track
 }
 
 func (p *Pattern) String() string {
@@ -40,20 +40,22 @@ func (p *Pattern) String() string {
 	output += fmt.Sprintf("Saved with HW Version: %s\n", p.Version)
 	output += fmt.Sprint("Tempo: ", p.Tempo, "\n")
 
-	for _, channel := range p.Channels {
-		output += fmt.Sprintf("%s\n", channel.String())
+	for _, Track := range p.Tracks {
+		output += fmt.Sprintf("%s\n", Track.String())
 	}
 
 	return output
 }
 
-type Channel struct {
-	Id    int32
+// Track represents the steps and metadata about a
+// particular music track in a Pattern
+type Track struct {
+	ID    int32
 	Name  string
 	Steps []uint32
 }
 
-func (c *Channel) printPattern() string {
+func (c *Track) printPattern() string {
 	output := "|"
 
 	// for each int32
@@ -62,7 +64,7 @@ func (c *Channel) printPattern() string {
 
 		// for each byte
 		for idx := uint32(0); idx < 4; idx++ {
-			var shiftedMask uint32 = mask << (idx * 8)
+			shiftedMask := mask << (idx * 8)
 			if val&shiftedMask == 0x00 {
 				output += "-"
 			} else {
@@ -76,6 +78,6 @@ func (c *Channel) printPattern() string {
 	return output
 }
 
-func (c *Channel) String() string {
-	return fmt.Sprintf("(%d) %s\t%s", c.Id, c.Name, c.printPattern())
+func (c *Track) String() string {
+	return fmt.Sprintf("(%d) %s\t%s", c.ID, c.Name, c.printPattern())
 }

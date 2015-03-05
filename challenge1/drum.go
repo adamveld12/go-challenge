@@ -33,17 +33,17 @@ func parse(data []byte, p *Pattern) error {
 	}
 	p.Tempo = tempo
 
-	audioChannels, readAudioChannelErr := readAudioChannels(buf, totalSize, fileSize)
-	if readAudioChannelErr != nil {
-		return readAudioChannelErr
+	tracks, readTracksErr := readTracks(buf, totalSize, fileSize)
+	if readTracksErr != nil {
+		return readTracksErr
 	}
-	p.Channels = audioChannels
+	p.Tracks = tracks
 
 	return nil
 }
 
-func readAudioChannels(reader *bytes.Reader, totalSize, fileSize int) ([]Channel, error) {
-	audioChannels := make([]Channel, 0)
+func readTracks(reader *bytes.Reader, totalSize, fileSize int) ([]Track, error) {
+	var tracks []Track
 
 	endPosition := fileSize
 	position := (totalSize - fileSize) + (fileSize - reader.Len())
@@ -56,24 +56,24 @@ func readAudioChannels(reader *bytes.Reader, totalSize, fileSize int) ([]Channel
 		channelBytes := make([]byte, channelNameSize)
 		_, err := reader.Read(channelBytes)
 		if err != nil {
-			return audioChannels, errors.New("Could not read channel name")
+			return tracks, errors.New("Could not read Track name")
 		}
 
 		pattern := make([]uint32, 4)
 		patternReadErr := binary.Read(reader, binary.LittleEndian, &pattern)
 		if patternReadErr != nil {
-			return audioChannels, errors.New("Could not read channel steps")
+			return tracks, errors.New("Could not read Track steps")
 		}
 
-		audioChannels = append(audioChannels, Channel{
-			Id:    id,
-			Name:  string(channelBytes),
-			Steps: pattern})
+		tracks = append(tracks, Track{
+			id,
+			string(channelBytes),
+			pattern})
 
 		position += int(21) + int(channelNameSize)
 	}
 
-	return audioChannels, nil
+	return tracks, nil
 }
 
 func readTempo(reader *bytes.Reader) (float32, error) {
