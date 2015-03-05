@@ -9,31 +9,31 @@ import (
 )
 
 func parse(data []byte, p *Pattern) error {
-	buf := bytes.NewReader(data)
+	dataReader := bytes.NewReader(data)
 
-	totalSize := buf.Len()
-	if !isValidFile(buf) {
+	fileSize := dataReader.Len()
+	if !isValidFile(dataReader) {
 		return errors.New("Not a valid .splice file.")
 	}
 
-	fileSize, fileSizeErr := getSize(buf)
-	if fileSizeErr != nil || fileSize > buf.Len() {
-		return errors.New("File size is not correct.")
+	encodedDataSize, fileSizeErr := getEncodedDataSize(dataReader)
+	if fileSizeErr != nil || encodedDataSize > dataReader.Len() {
+		return errors.New("Encoded data size is incorrect.")
 	}
 
-	hwVersion, hwVersionErr := readHardwareVersion(buf)
+	hwVersion, hwVersionErr := readHardwareVersion(dataReader)
 	if hwVersionErr != nil {
 		return hwVersionErr
 	}
 	p.Version = hwVersion
 
-	tempo, readTempErr := readTempo(buf)
+	tempo, readTempErr := readTempo(dataReader)
 	if readTempErr != nil {
 		return readTempErr
 	}
 	p.Tempo = tempo
 
-	tracks, readTracksErr := readTracks(buf, totalSize, fileSize)
+	tracks, readTracksErr := readTracks(dataReader, fileSize, encodedDataSize)
 	if readTracksErr != nil {
 		return readTracksErr
 	}
@@ -42,13 +42,12 @@ func parse(data []byte, p *Pattern) error {
 	return nil
 }
 
-func readTracks(reader *bytes.Reader, totalSize, fileSize int) ([]Track, error) {
+func readTracks(reader *bytes.Reader, fileSize, encodedDataSize int) ([]Track, error) {
 	var tracks []Track
 
-	endPosition := fileSize
-	position := (totalSize - fileSize) + (fileSize - reader.Len())
+	position := (fileSize - encodedDataSize) + (encodedDataSize - reader.Len())
 
-	for position < endPosition {
+	for position < encodedDataSize {
 		var id int32
 		binary.Read(reader, binary.LittleEndian, &id)
 
@@ -56,13 +55,13 @@ func readTracks(reader *bytes.Reader, totalSize, fileSize int) ([]Track, error) 
 		channelBytes := make([]byte, channelNameSize)
 		_, err := reader.Read(channelBytes)
 		if err != nil {
-			return tracks, errors.New("Could not read Track name")
+			return []Track{}, errors.New("Could not read Track name with id " + id)
 		}
 
 		pattern := make([]uint32, 4)
 		patternReadErr := binary.Read(reader, binary.LittleEndian, &pattern)
 		if patternReadErr != nil {
-			return tracks, errors.New("Could not read Track steps")
+			return []Track{}, errors.New("Could not read Track step with id " + id)
 		}
 
 		tracks = append(tracks, Track{
@@ -112,13 +111,17 @@ func isValidFile(reader *bytes.Reader) bool {
 	return true
 }
 
-func getSize(reader *bytes.Reader) (int, error) {
-	var fileSize int64
-	fileSizeReadError := binary.Read(reader, binary.BigEndian, &fileSize)
+func getEncodedDataSize(reader *bytes.Reader) (int, error) {
+	var encodedDataSize int64
+	fileSizeReadError := binary.Read(reader, binary.BigEndian, &encodedDataSize)
 
 	if fileSizeReadError != nil {
 		return 0, fileSizeReadError
 	}
 
-	return int(fileSize), nil
+	// int cast because it will be easier to deal
+	// with throughout the code, and I feel like using
+	// an int64 for the file size is a bit much
+	// and we can get away with the precision loss
+	return int(encodedDataSize), nil
 }
