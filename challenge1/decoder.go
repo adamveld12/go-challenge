@@ -68,13 +68,10 @@ type Pattern struct {
 }
 
 func (p *Pattern) String() string {
-	output := ""
-
-	output += fmt.Sprintf("Saved with HW Version: %s\n", p.Version)
-	output += fmt.Sprint("Tempo: ", p.Tempo, "\n")
+	output := fmt.Sprintf("Saved with HW Version: %s\nTempo: %g\n", p.Version, p.Tempo)
 
 	for _, Track := range p.Tracks {
-		output += fmt.Sprintf("%s\n", Track.String())
+		output += fmt.Sprintln(Track.String())
 	}
 
 	return output
