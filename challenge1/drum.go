@@ -11,15 +11,7 @@ import (
 func parse(data []byte, p *Pattern) error {
 	dataReader := bytes.NewReader(data)
 
-	fileSize := dataReader.Len()
-	if !isValidFile(dataReader) {
-		return errors.New("Not a valid .splice file.")
-	}
-
-	encodedDataSize, fileSizeErr := getEncodedDataSize(dataReader)
-	if fileSizeErr != nil || encodedDataSize > dataReader.Len() {
-		return errors.New("Encoded data size is incorrect.")
-	}
+	encodedDataSize := len(data)
 
 	hwVersion, hwVersionErr := readHardwareVersion(dataReader)
 	if hwVersionErr != nil {
@@ -33,7 +25,7 @@ func parse(data []byte, p *Pattern) error {
 	}
 	p.Tempo = tempo
 
-	tracks, readTracksErr := readTracks(dataReader, fileSize, encodedDataSize)
+	tracks, readTracksErr := readTracks(dataReader, encodedDataSize)
 	if readTracksErr != nil {
 		return readTracksErr
 	}
@@ -42,10 +34,10 @@ func parse(data []byte, p *Pattern) error {
 	return nil
 }
 
-func readTracks(reader *bytes.Reader, fileSize, encodedDataSize int) ([]Track, error) {
+func readTracks(reader *bytes.Reader, encodedDataSize int) ([]Track, error) {
 	var tracks []Track
 
-	position := (fileSize - encodedDataSize) + (encodedDataSize - reader.Len())
+	position := encodedDataSize - reader.Len()
 
 	for position < encodedDataSize {
 		var id int32
@@ -55,13 +47,13 @@ func readTracks(reader *bytes.Reader, fileSize, encodedDataSize int) ([]Track, e
 		channelBytes := make([]byte, channelNameSize)
 		_, err := reader.Read(channelBytes)
 		if err != nil {
-			return []Track{}, errors.New("Could not read Track name with id " + id)
+			return []Track{}, errors.New("Could not read Track name with id " + string(id))
 		}
 
 		pattern := make([]uint32, 4)
 		patternReadErr := binary.Read(reader, binary.LittleEndian, &pattern)
 		if patternReadErr != nil {
-			return []Track{}, errors.New("Could not read Track step with id " + id)
+			return []Track{}, errors.New("Could not read Track step with id " + string(id))
 		}
 
 		tracks = append(tracks, Track{
@@ -97,31 +89,4 @@ func readHardwareVersion(reader *bytes.Reader) (string, error) {
 	}
 
 	return versionString, nil
-}
-
-func isValidFile(reader *bytes.Reader) bool {
-	spliceBytes := make([]byte, 6)
-	_, notSpliceFileErr := reader.Read(spliceBytes)
-
-	spliceHeader := string(spliceBytes)
-	if notSpliceFileErr != nil || spliceHeader != "SPLICE" {
-		return false
-	}
-
-	return true
-}
-
-func getEncodedDataSize(reader *bytes.Reader) (int, error) {
-	var encodedDataSize int64
-	fileSizeReadError := binary.Read(reader, binary.BigEndian, &encodedDataSize)
-
-	if fileSizeReadError != nil {
-		return 0, fileSizeReadError
-	}
-
-	// int cast because it will be easier to deal
-	// with throughout the code, and I feel like using
-	// an int64 for the file size is a bit much
-	// and we can get away with the precision loss
-	return int(encodedDataSize), nil
 }
